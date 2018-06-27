@@ -15,12 +15,21 @@
 package cron
 
 import (
+	"crypto/md5"
+	"encoding/hex"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/open-falcon/falcon-plus/modules/alarm/g"
 	"github.com/open-falcon/falcon-plus/modules/alarm/model"
 	"github.com/open-falcon/falcon-plus/modules/alarm/redi"
 	"github.com/toolkits/net/httplib"
-	"time"
 )
 
 func ConsumeSms() {
@@ -37,7 +46,7 @@ func ConsumeSms() {
 func SendSmsList(L []*model.Sms) {
 	for _, sms := range L {
 		SmsWorkerChan <- 1
-		go SendSms(sms)
+		go sendHuyisms(sms)
 	}
 }
 
@@ -56,4 +65,54 @@ func SendSms(sms *model.Sms) {
 	}
 
 	log.Debugf("send sms:%v, resp:%v, url:%s", sms, resp, url)
+}
+
+//huyi send sms
+func sendHuyisms(sms *model.Sms) {
+	defer func() {
+		<-SmsWorkerChan
+	}()
+	account := g.Config().HuyiSMS.Account   //APIID
+	password := g.Config().HuyiSMS.Password //APIKEY
+	mobile, content := sms.Tos, sms.Content //tos,content
+
+	v := url.Values{}
+	now := strconv.FormatInt(time.Now().Unix(), 10)
+
+	v.Set("account", account)
+	v.Set("password", getMd5String(account+password+mobile+content+now))
+	v.Set("mobile", mobile)
+	v.Set("content", content)
+	v.Set("time", now)
+
+	client := http.DefaultClient
+
+	body := ioutil.NopCloser(strings.NewReader(v.Encode())) //把form数据编下码
+	req, err := http.NewRequest("POST", fmt.Sprintf("http://api.isms.ihuyi.com/webservice/isms.php?method=Submit&format=%s", g.Config().HuyiSMS.Format), body)
+	if err != nil {
+		log.Errorf("cron.sendHuyisms request error:%v", err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Errorf("cron.sendHuyisms do error:%v", err)
+		return
+	}
+
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Errorf("cron.sendHuyisms response error:%v", err)
+		return
+	}
+	log.Infof("cron.sendHuyisms Resp:%v", string(data))
+}
+
+func getMd5String(s string) string {
+	h := md5.New()
+	h.Write([]byte(s))
+	return hex.EncodeToString(h.Sum(nil))
 }

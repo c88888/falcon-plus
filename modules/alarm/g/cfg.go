@@ -63,6 +63,13 @@ type HousekeeperConfig struct {
 	EventDeleteBatch   int `json:"event_delete_batch"`
 }
 
+//HuyismsConfig huyi sms configure
+type HuyismsConfig struct {
+	Account  string `json:"account"`
+	Password string `json:"password"`
+	Format   string `json:"format"`
+}
+
 type GlobalConfig struct {
 	LogLevel     string              `json:"log_level"`
 	FalconPortal *FalconPortalConfig `json:"falcon_portal"`
@@ -71,6 +78,7 @@ type GlobalConfig struct {
 	Api          *ApiConfig          `json:"api"`
 	Worker       *WorkerConfig       `json:"worker"`
 	Housekeeper  *HousekeeperConfig  `json:"Housekeeper"`
+	HuyiSMS      *HuyismsConfig      `json:"huyisms"`
 }
 
 var (
